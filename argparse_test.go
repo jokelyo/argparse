@@ -5,6 +5,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -208,7 +209,7 @@ func TestStringSimple2(t *testing.T) {
 	testArgs := []string{"progname", "--flag-arg1", "test"}
 
 	p := NewParser("", "description")
-	s1 := p.String("f", "flag-arg1", nil)
+	s1 := p.String("f", "flag-arg1", &Options{Nargs: 3})
 	s2 := p.String("", "flag-arg2", nil)
 
 	err := p.Parse(testArgs)
@@ -234,6 +235,312 @@ func TestStringSimple2(t *testing.T) {
 
 	if *s2 != "" {
 		t.Errorf("Test %s failed. Want: [%s], got: [%s]", t.Name(), "\"\"", *s1)
+		return
+	}
+}
+
+func TestStringsSimple1(t *testing.T) {
+	testArgs := []string{"progname", "--flag-arg1", "test"}
+
+	p := NewParser("", "description")
+	s1 := p.Strings("f", "flag-arg1", nil)
+	s2 := p.Strings("", "flag-arg2", nil)
+
+	err := p.Parse(testArgs)
+	if err != nil {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if s1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if s2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if (*s1)[0] != "test" {
+		t.Errorf("Test %s failed. Want: [%s], got: [%s]", t.Name(), "test", *s1)
+		return
+	}
+
+	if len(*s2) != 0 {
+		t.Errorf("Test %s failed. Want: [0] length, got: [%d]", t.Name(), len(*s2))
+		return
+	}
+}
+
+func TestStringsNargsInvalidChar(t *testing.T) {
+	testS1 := []string{"test", "test", "test"}
+	testS2 := []string{"test"}
+	testArgs := []string{"progname", "-f", testS1[0], testS1[1], testS1[2], "--flag-arg2", testS2[0]}
+
+	p := NewParser("", "description")
+	_ = p.Strings("f", "flag-arg1", &Options{Nargs: 3})
+	_ = p.Strings("g", "flag-arg2", &Options{Nargs: "b"})
+
+	err := p.Parse(testArgs)
+	if err == nil {
+		t.Errorf("Test %s failed, expected \"invalid string value ...\" error for --flag-arg2", t.Name())
+		return
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "invalid string value") {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+}
+
+// Strings nargs N test cases:
+// 	* correct number of args
+// 	* incorrect number of args
+func TestStringsNargsInt(t *testing.T) {
+	testS1 := []string{"test", "test", "test"}
+	testS2 := []string{"test"}
+	testArgs := []string{"progname", "-f", testS1[0], testS1[1], testS1[2], "--flag-arg2", testS2[0], "-v"}
+
+	p := NewParser("", "description")
+	s1 := p.Strings("f", "flag-arg1", &Options{Nargs: 3})
+	s2 := p.Strings("g", "flag-arg2", &Options{Nargs: 2})
+	_ = p.Strings("v", "version", nil)
+
+	err := p.Parse(testArgs)
+	if err == nil {
+		t.Errorf("Test %s failed, expected \"not enough arguments ...\" error for --flag-arg2", t.Name())
+		return
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "not enough arguments") {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if s1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if s2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if len(*s1) != len(testS1) {
+		t.Errorf("Test %s s1 length failed. Want: [%d], got: [%d]", t.Name(), len(testS1), len(*s1))
+		return
+	}
+
+	if len(*s2) != 0 {
+		t.Errorf("Test %s s2 length failed. Want: [%d], got: [%d]", t.Name(), 0, len(*s2))
+		return
+	}
+}
+
+func TestStringsNargsIntWithErr(t *testing.T) {
+	testS1 := []string{"test", "test", "test"}
+	testS2 := []string{"test"}
+	testArgs := []string{"progname", "-f", testS1[0], testS1[1], testS1[2], "--flag-arg2", testS2[0]}
+
+	p := NewParser("", "description")
+	_ = p.Strings("f", "flag-arg1", &Options{Nargs: 3})
+	_ = p.Strings("g", "flag-arg2", &Options{Nargs: -1})
+
+	err := p.Parse(testArgs)
+	if err == nil {
+		t.Errorf("Test %s failed, expected \"nargs integer value ...\" error for --flag-arg2", t.Name())
+		return
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "nargs integer value") {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+}
+
+// String nargs '?' test cases:
+//	* one arg
+//	* no args
+//	* followed by a flag
+//	* at beginning of arg list
+//	* at end of arg list
+func TestStringNargs0or1(t *testing.T) {
+	testS2 := []string{"test", "test"}
+	testArgs := []string{"progname", "-f", "test1", "--flag-arg2", testS2[0], testS2[1], "-i", "-v", "-j"}
+
+	p := NewParser("", "description")
+	s1 := p.String("f", "flag-arg1", &Options{Nargs: "?"})
+	s2 := p.Strings("g", "flag-arg2", &Options{Nargs: 2})
+	s3 := p.String("i", "flag-arg3", &Options{Nargs: "?", Default: "test3"})
+	s4 := p.String("j", "flag-arg4", &Options{Nargs: "?", Default: "test4"})
+	_ = p.Flag("v", "version", nil)
+
+	err := p.Parse(testArgs)
+	if err != nil {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if s1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if s2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if s3 == nil {
+		t.Errorf("Test %s failed with flag3 being nil pointer", t.Name())
+		return
+	}
+
+	if s4 == nil {
+		t.Errorf("Test %s failed with flag4 being nil pointer", t.Name())
+		return
+	}
+
+	if *s1 != "test1" {
+		t.Errorf("Test %s s1 failed. Want: [%s], got: [%s]", t.Name(), "test1", *s1)
+		return
+	}
+
+	if *s3 != "test3" {
+		t.Errorf("Test %s s3 failed. Want: [%s], got: [%s]", t.Name(), "test3", *s3)
+		return
+	}
+
+	if *s4 != "test4" {
+		t.Errorf("Test %s s4 failed. Want: [%s], got: [%s]", t.Name(), "test4", *s4)
+		return
+	}
+}
+
+// Strings nargs '*' test cases:
+//	* no args
+//	* multiple args
+//	* at beginning of arg list
+//	* at end of arg list
+//	* multiple flags with '*'
+func TestStringsNargs0orMore(t *testing.T) {
+	testS1 := []string{"test"}
+	testS3 := []string{"test", "test"}
+	testArgs := []string{"progname", "-f", testS1[0], "-g", "-i", testS3[0], testS3[1], "-j"}
+
+	p := NewParser("", "description")
+	s1 := p.Strings("f", "flag-arg1", &Options{Nargs: "*"})
+	s2 := p.Strings("g", "flag-arg2", &Options{Nargs: "*"})
+	s3 := p.Strings("i", "flag-arg3", &Options{Nargs: "*"})
+	s4 := p.Strings("j", "flag-arg4", &Options{Nargs: "*"})
+
+	err := p.Parse(testArgs)
+	if err != nil {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if s1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if s2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if s3 == nil {
+		t.Errorf("Test %s failed with flag3 being nil pointer", t.Name())
+		return
+	}
+
+	if s4 == nil {
+		t.Errorf("Test %s failed with flag4 being nil pointer", t.Name())
+		return
+	}
+
+	if !(len(*s1) == len(testS1) && (*s1)[0] == "test") {
+		t.Errorf("Test %s s1 failed. Want: %s, got: %s", t.Name(), testS1, *s1)
+		return
+	}
+
+	if len(*s2) != 0 {
+		t.Errorf("Test %s s2 length failed. Want: [0], got: [%d]", t.Name(), len(*s2))
+		return
+	}
+
+	if !(len(*s3) == len(testS3) && (*s3)[0] == "test") {
+		t.Errorf("Test %s s3 failed. Want: %s, got: %s", t.Name(), testS3, *s3)
+		return
+	}
+
+	if len(*s4) != 0 {
+		t.Errorf("Test %s s4 length failed. Want: [0], got: [%d]", t.Name(), len(*s4))
+		return
+	}
+}
+
+// Strings nargs '+' test cases:
+//	* one arg
+//	* multiple args
+//	* at beginning of arg list
+//	* at end of arg list
+//	* multiple flags with '+'
+func TestStringsNargs1orMore(t *testing.T) {
+	testS1 := []string{"test"}
+	testS2 := []string{"test", "test"}
+	testArgs := []string{"progname", "-f", testS1[0], "-g", testS2[0], testS2[1]}
+
+	p := NewParser("", "description")
+	s1 := p.Strings("f", "flag-arg1", &Options{Nargs: "+"})
+	s2 := p.Strings("g", "flag-arg2", &Options{Nargs: "+"})
+
+	err := p.Parse(testArgs)
+	if err != nil {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if s1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if s2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if !(len(*s1) == len(testS1) && (*s1)[0] == "test") {
+		t.Errorf("Test %s s1 failed. Want: %s, got: %s", t.Name(), testS1, *s1)
+		return
+	}
+
+	if !(len(*s2) == len(testS2) && (*s2)[0] == "test") {
+		t.Errorf("Test %s s2 failed. Want: %s, got: %s", t.Name(), testS2, *s2)
+		return
+	}
+}
+
+func TestStringsNargs1orMoreWithErr(t *testing.T) {
+	testS2 := []string{"test", "test"}
+	testArgs := []string{"progname", "-f", "-g", testS2[0], testS2[1]}
+
+	p := NewParser("", "description")
+	_ = p.Strings("f", "flag-arg1", &Options{Nargs: "+"})
+	_ = p.Strings("i", "flag-arg2", &Options{Nargs: "+"})
+
+	err := p.Parse(testArgs)
+	if err == nil {
+		t.Errorf("Test %s failed, expected \"... at least one argument\" error for --flag-arg1", t.Name())
+		return
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "requires at least one argument") {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
 		return
 	}
 }
