@@ -2,6 +2,7 @@ package argparse
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"reflect"
 	"strconv"
@@ -328,8 +329,8 @@ func TestStringsNargsInt(t *testing.T) {
 		return
 	}
 
-	if len(*s1) != len(testS1) {
-		t.Errorf("Test %s s1 length failed. Want: [%d], got: [%d]", t.Name(), len(testS1), len(*s1))
+	if !(len(*s1) == len(testS1) && (*s1)[0] == "test") {
+		t.Errorf("Test %s s1 failed. Want: %s, got: %s", t.Name(), testS1, *s1)
 		return
 	}
 
@@ -585,7 +586,7 @@ func TestIntSimple2(t *testing.T) {
 	testArgs := []string{"progname", "--flag-arg1", strconv.Itoa(val)}
 
 	p := NewParser("", "description")
-	i1 := p.Int("f", "flag-arg1", nil)
+	i1 := p.Int("f", "flag-arg1", &Options{Nargs: 3})
 	i2 := p.Int("", "flag-arg2", nil)
 
 	err := p.Parse(testArgs)
@@ -635,6 +636,376 @@ func TestIntFailSimple1(t *testing.T) {
 
 	if *i1 != 0 {
 		t.Errorf("Test %s failed. Want: [0], got: [%d]", t.Name(), *i1)
+		return
+	}
+}
+
+func TestIntsSimple1(t *testing.T) {
+	testval := 5150
+	testArgs := []string{"progname", "--flag-arg1", strconv.Itoa(testval)}
+
+	p := NewParser("", "description")
+	i1 := p.Ints("f", "flag-arg1", nil)
+	i2 := p.Ints("", "flag-arg2", nil)
+
+	err := p.Parse(testArgs)
+	if err != nil {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if i1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if i2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if len(*i1) != 1 {
+		t.Errorf("Test %s length failed. Want: [1], got: [%d]", t.Name(), len(*i1))
+		return
+	}
+
+	if (*i1)[0] != testval {
+		t.Errorf("Test %s value failed. Want: [%d], got: [%d]", t.Name(), testval, (*i1)[0])
+		return
+	}
+
+	if len(*i2) != 0 {
+		t.Errorf("Test %s failed. Want: [0] length, got: [%d]", t.Name(), len(*i2))
+		return
+	}
+}
+
+func TestIntsNargsInvalidChar(t *testing.T) {
+	testArgs := []string{"progname", "-f", "1", "2", "3"}
+
+	p := NewParser("", "description")
+	_ = p.Ints("f", "flag-arg1", &Options{Nargs: "x"})
+
+	err := p.Parse(testArgs)
+	if err == nil {
+		t.Errorf("Test %s failed, expected \"invalid string value ...\" error for --flag-arg1", t.Name())
+		return
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "invalid string value") {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+}
+
+func TestIntsNargsInvalidNum(t *testing.T) {
+	testArgs := []string{"progname", "-f", "1", "2", "3"}
+
+	p := NewParser("", "description")
+	_ = p.Ints("f", "flag-arg1", &Options{Nargs: -1})
+
+	err := p.Parse(testArgs)
+	if err == nil {
+		t.Errorf("Test %s failed, expected \"nargs integer value ...\" error for --flag-arg1", t.Name())
+		return
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "nargs integer value") {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+}
+
+// Strings nargs N test cases:
+// 	* correct number of args
+// 	* incorrect number of args
+func TestIntsNargsInt(t *testing.T) {
+	testI1 := []int{1, 2, 3}
+	testI2 := []int{5}
+	testArgs := []string{
+		"progname",
+		"-f",
+		strconv.Itoa(testI1[0]),
+		strconv.Itoa(testI1[1]),
+		strconv.Itoa(testI1[2]),
+		"--flag-arg2",
+		strconv.Itoa(testI2[0]),
+		"-v",
+	}
+
+	p := NewParser("", "description")
+	i1 := p.Ints("f", "flag-arg1", &Options{Nargs: 3})
+	i2 := p.Ints("g", "flag-arg2", &Options{Nargs: 2})
+	_ = p.Ints("v", "version", nil)
+
+	err := p.Parse(testArgs)
+	if err == nil {
+		t.Errorf("Test %s failed, expected \"not enough arguments ...\" error for --flag-arg2", t.Name())
+		return
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "not enough arguments") {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if i1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if i2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if !(len(*i1) == len(testI1) && (*i1)[0] == testI1[0]) {
+		t.Errorf("Test %s i1 failed. Want: %v, got: %v", t.Name(), testI1, *i1)
+		return
+	}
+
+	if len(*i2) != 0 {
+		t.Errorf("Test %s i2 length failed. Want: [%d], got: [%d]", t.Name(), 0, len(*i2))
+		return
+	}
+}
+
+func TestIntsNargsIntWithErr(t *testing.T) {
+	testI1 := []int{1, 2, 3}
+	testI2 := []int{5}
+	testArgs := []string{
+		"progname",
+		"-f",
+		strconv.Itoa(testI1[0]),
+		strconv.Itoa(testI1[1]),
+		strconv.Itoa(testI1[2]),
+		"--flag-arg2",
+		strconv.Itoa(testI2[0]),
+	}
+	p := NewParser("", "description")
+	_ = p.Ints("f", "flag-arg1", &Options{Nargs: 3})
+	_ = p.Ints("g", "flag-arg2", &Options{Nargs: -1})
+
+	err := p.Parse(testArgs)
+	if err == nil {
+		t.Errorf("Test %s failed, expected \"nargs integer value ...\" error for --flag-arg2", t.Name())
+		return
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "nargs integer value") {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+}
+
+// String nargs '?' test cases:
+//	* one arg
+//	* no args
+//	* followed by a flag
+//	* at beginning of arg list
+//	* at end of arg list
+func TestIntNargs0or1(t *testing.T) {
+	testval := 5150
+	testI2 := []int{5, 6}
+	testArgs := []string{
+		"progname",
+		"-f",
+		strconv.Itoa(testval),
+		"--flag-arg2",
+		strconv.Itoa(testI2[0]),
+		strconv.Itoa(testI2[1]),
+		"-i",
+		"-v",
+		"-j",
+	}
+
+	p := NewParser("", "description")
+	i1 := p.Int("f", "flag-arg1", &Options{Nargs: "?"})
+	i2 := p.Ints("g", "flag-arg2", &Options{Nargs: 2})
+	i3 := p.Int("i", "flag-arg3", &Options{Nargs: "?", Default: 3})
+	i4 := p.Int("j", "flag-arg4", &Options{Nargs: "?", Default: 4})
+	_ = p.Flag("v", "version", nil)
+
+	err := p.Parse(testArgs)
+	if err != nil {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if i1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if i2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if i3 == nil {
+		t.Errorf("Test %s failed with flag3 being nil pointer", t.Name())
+		return
+	}
+
+	if i4 == nil {
+		t.Errorf("Test %s failed with flag4 being nil pointer", t.Name())
+		return
+	}
+
+	if *i1 != testval {
+		t.Errorf("Test %s i1 failed. Want: [%d], got: [%d]", t.Name(), testval, *i1)
+		return
+	}
+
+	if *i3 != 3 {
+		t.Errorf("Test %s i3 failed. Want: [%d], got: [%d]", t.Name(), 3, *i3)
+		return
+	}
+
+	if *i4 != 4 {
+		t.Errorf("Test %s i4 failed. Want: [%d], got: [%d]", t.Name(), 4, *i4)
+		return
+	}
+}
+
+// Strings nargs '*' test cases:
+//	* no args
+//	* multiple args
+//	* at beginning of arg list
+//	* at end of arg list
+//	* multiple flags with '*'
+func TestIntsNargs0orMore(t *testing.T) {
+	testI1 := []int{1}
+	testI3 := []int{3, 4}
+	testArgs := []string{
+		"progname",
+		"-f",
+		strconv.Itoa(testI1[0]),
+		"-g",
+		"-i",
+		strconv.Itoa(testI3[0]),
+		strconv.Itoa(testI3[1]),
+		"-j",
+	}
+
+	p := NewParser("", "description")
+	i1 := p.Ints("f", "flag-arg1", &Options{Nargs: "*"})
+	i2 := p.Ints("g", "flag-arg2", &Options{Nargs: "*"})
+	i3 := p.Ints("i", "flag-arg3", &Options{Nargs: "*"})
+	i4 := p.Ints("j", "flag-arg4", &Options{Nargs: "*"})
+
+	err := p.Parse(testArgs)
+	if err != nil {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if i1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if i2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if i3 == nil {
+		t.Errorf("Test %s failed with flag3 being nil pointer", t.Name())
+		return
+	}
+
+	if i4 == nil {
+		t.Errorf("Test %s failed with flag4 being nil pointer", t.Name())
+		return
+	}
+
+	if !(len(*i1) == len(testI1) && (*i1)[0] == testI1[0]) {
+		t.Errorf("Test %s i1 failed. Want: %d, got: %d", t.Name(), testI1, *i1)
+		return
+	}
+
+	if len(*i2) != 0 {
+		t.Errorf("Test %s i2 length failed. Want: [0], got: [%d]", t.Name(), len(*i2))
+		return
+	}
+
+	if !(len(*i3) == len(testI3) && (*i3)[0] == testI3[0]) {
+		t.Errorf("Test %s i3 failed. Want: %v, got: %v", t.Name(), testI3, *i3)
+		return
+	}
+
+	if len(*i4) != 0 {
+		t.Errorf("Test %s i4 length failed. Want: [0], got: [%d]", t.Name(), len(*i4))
+		return
+	}
+}
+
+// Strings nargs '+' test cases:
+//	* one arg
+//	* multiple args
+//	* at beginning of arg list
+//	* at end of arg list
+//	* multiple flags with '+'
+func TestIntsNargs1orMore(t *testing.T) {
+	testI1 := []int{1}
+	testI2 := []int{3, 4}
+	testArgs := []string{
+		"progname",
+		"-f",
+		strconv.Itoa(testI1[0]),
+		"-g",
+		strconv.Itoa(testI2[0]),
+		strconv.Itoa(testI2[1]),
+	}
+
+	p := NewParser("", "description")
+	i1 := p.Ints("f", "flag-arg1", &Options{Nargs: "+"})
+	i2 := p.Ints("g", "flag-arg2", &Options{Nargs: "+"})
+
+	err := p.Parse(testArgs)
+	if err != nil {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if i1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if i2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if !(len(*i1) == len(testI1) && (*i1)[0] == testI1[0]) {
+		t.Errorf("Test %s i1 failed. Want: %v, got: %v", t.Name(), testI1, *i1)
+		return
+	}
+
+	if !(len(*i2) == len(testI2) && (*i2)[0] == testI2[0]) {
+		t.Errorf("Test %s i2 failed. Want: %v, got: %v", t.Name(), testI2, *i2)
+		return
+	}
+}
+
+func TestIntsNargs1orMoreWithErr(t *testing.T) {
+	testI2 := []int{3, 4}
+	testArgs := []string{"progname", "-f", "-g", strconv.Itoa(testI2[0]), strconv.Itoa(testI2[1])}
+
+	p := NewParser("", "description")
+	_ = p.Ints("f", "flag-arg1", &Options{Nargs: "+"})
+	_ = p.Ints("i", "flag-arg2", &Options{Nargs: "+"})
+
+	err := p.Parse(testArgs)
+	if err == nil {
+		t.Errorf("Test %s failed, expected \"... at least one argument\" error for --flag-arg1", t.Name())
+		return
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "requires at least one argument") {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
 		return
 	}
 }
@@ -1429,6 +1800,375 @@ func TestFloatFail1(t *testing.T) {
 
 	if *f1 != 0 {
 		t.Errorf("Test %s failed. Want: [0], got: [%f]", t.Name(), *f1)
+		return
+	}
+}
+
+func TestFloatsSimple1(t *testing.T) {
+	testval := 5.5
+	testArgs := []string{"progname", "--flag-arg1", fmt.Sprintf("%.1f", testval)}
+
+	p := NewParser("", "description")
+	i1 := p.Floats("f", "flag-arg1", nil)
+	i2 := p.Floats("", "flag-arg2", nil)
+
+	err := p.Parse(testArgs)
+	if err != nil {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if i1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if i2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if len(*i1) != 1 {
+		t.Errorf("Test %s length failed. Want: [1], got: [%d]", t.Name(), len(*i1))
+		return
+	}
+
+	if (*i1)[0] != testval {
+		t.Errorf("Test %s value failed. Want: [%f], got: [%f]", t.Name(), testval, (*i1)[0])
+		return
+	}
+
+	if len(*i2) != 0 {
+		t.Errorf("Test %s failed. Want: [0] length, got: [%d]", t.Name(), len(*i2))
+		return
+	}
+}
+
+func TestFloatsNargsInvalidChar(t *testing.T) {
+	testArgs := []string{"progname", "-f", "1", "2", "3"}
+
+	p := NewParser("", "description")
+	_ = p.Floats("f", "flag-arg1", &Options{Nargs: "x"})
+
+	err := p.Parse(testArgs)
+	if err == nil {
+		t.Errorf("Test %s failed, expected \"invalid string value ...\" error for --flag-arg1", t.Name())
+		return
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "invalid string value") {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+}
+
+func TestFloatsNargsInvalidNum(t *testing.T) {
+	testArgs := []string{"progname", "-f", "1", "2", "3"}
+
+	p := NewParser("", "description")
+	_ = p.Floats("f", "flag-arg1", &Options{Nargs: -1})
+
+	err := p.Parse(testArgs)
+	if err == nil {
+		t.Errorf("Test %s failed, expected \"nargs integer value ...\" error for --flag-arg1", t.Name())
+		return
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "nargs integer value") {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+}
+
+// Strings nargs N test cases:
+// 	* correct number of args
+// 	* incorrect number of args
+func TestFloatsNargsInt(t *testing.T) {
+	testF1 := []float64{1, 2, 3}
+	testF2 := []float64{5}
+	testArgs := []string{
+		"progname",
+		"-f",
+		fmt.Sprintf("%f", testF1[0]),
+		fmt.Sprintf("%f", testF1[1]),
+		fmt.Sprintf("%f", testF1[2]),
+		"--flag-arg2",
+		fmt.Sprintf("%f", testF2[0]),
+		"-v",
+	}
+
+	p := NewParser("", "description")
+	f1 := p.Floats("f", "flag-arg1", &Options{Nargs: 3})
+	f2 := p.Floats("g", "flag-arg2", &Options{Nargs: 2})
+	_ = p.Floats("v", "version", nil)
+
+	err := p.Parse(testArgs)
+	if err == nil {
+		t.Errorf("Test %s failed, expected \"not enough arguments ...\" error for --flag-arg2", t.Name())
+		return
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "not enough arguments") {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if f1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if f2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if !(len(*f1) == len(testF1) && (*f1)[0] == testF1[0]) {
+		t.Errorf("Test %s i1 failed. Want: %v, got: %v", t.Name(), testF1, *f1)
+		return
+	}
+
+	if len(*f2) != 0 {
+		t.Errorf("Test %s i2 length failed. Want: [%d], got: [%d]", t.Name(), 0, len(*f2))
+		return
+	}
+}
+
+func TestFloatsNargsIntWithErr(t *testing.T) {
+	testF1 := []float64{1, 2, 3}
+	testF2 := []float64{5}
+	testArgs := []string{
+		"progname",
+		"-f",
+		fmt.Sprintf("%f", testF1[0]),
+		fmt.Sprintf("%f", testF1[1]),
+		fmt.Sprintf("%f", testF1[2]),
+		"--flag-arg2",
+		fmt.Sprintf("%f", testF2[0]),
+	}
+	p := NewParser("", "description")
+	_ = p.Floats("f", "flag-arg1", &Options{Nargs: 3})
+	_ = p.Floats("g", "flag-arg2", &Options{Nargs: -1})
+
+	err := p.Parse(testArgs)
+	if err == nil {
+		t.Errorf("Test %s failed, expected \"nargs integer value ...\" error for --flag-arg2", t.Name())
+		return
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "nargs integer value") {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+}
+
+// String nargs '?' test cases:
+//	* one arg
+//	* no args
+//	* followed by a flag
+//	* at beginning of arg list
+//	* at end of arg list
+func TestFloatNargs0or1(t *testing.T) {
+	testval := 5.5
+	testF2 := []float64{5, 6}
+	testArgs := []string{
+		"progname",
+		"-f",
+		fmt.Sprintf("%f", testval),
+		"--flag-arg2",
+		fmt.Sprintf("%f", testF2[0]),
+		fmt.Sprintf("%f", testF2[1]),
+		"-i",
+		"-v",
+		"-j",
+	}
+
+	p := NewParser("", "description")
+	f1 := p.Float("f", "flag-arg1", &Options{Nargs: "?"})
+	f2 := p.Floats("g", "flag-arg2", &Options{Nargs: 2})
+	f3 := p.Float("i", "flag-arg3", &Options{Nargs: "?", Default: 3.0})
+	f4 := p.Float("j", "flag-arg4", &Options{Nargs: "?", Default: 4.0})
+	_ = p.Flag("v", "version", nil)
+
+	err := p.Parse(testArgs)
+	if err != nil {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if f1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if f2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if f3 == nil {
+		t.Errorf("Test %s failed with flag3 being nil pointer", t.Name())
+		return
+	}
+
+	if f4 == nil {
+		t.Errorf("Test %s failed with flag4 being nil pointer", t.Name())
+		return
+	}
+
+	if *f1 != testval {
+		t.Errorf("Test %s i1 failed. Want: [%f], got: [%f]", t.Name(), testval, *f1)
+		return
+	}
+
+	if *f3 != 3.0 {
+		t.Errorf("Test %s i3 failed. Want: [%f], got: [%f]", t.Name(), 3.0, *f3)
+		return
+	}
+
+	if *f4 != 4.0 {
+		t.Errorf("Test %s i4 failed. Want: [%f], got: [%f]", t.Name(), 4.0, *f4)
+		return
+	}
+}
+
+// Strings nargs '*' test cases:
+//	* no args
+//	* multiple args
+//	* at beginning of arg list
+//	* at end of arg list
+//	* multiple flags with '*'
+func TestFloatsNargs0orMore(t *testing.T) {
+	testF1 := []float64{1}
+	testF3 := []float64{3, 4}
+	testArgs := []string{
+		"progname",
+		"-f",
+		fmt.Sprintf("%f", testF1[0]),
+		"-g",
+		"-i",
+		fmt.Sprintf("%f", testF3[0]),
+		fmt.Sprintf("%f", testF3[1]),
+		"-j",
+	}
+
+	p := NewParser("", "description")
+	f1 := p.Floats("f", "flag-arg1", &Options{Nargs: "*"})
+	f2 := p.Floats("g", "flag-arg2", &Options{Nargs: "*"})
+	f3 := p.Floats("i", "flag-arg3", &Options{Nargs: "*"})
+	f4 := p.Floats("j", "flag-arg4", &Options{Nargs: "*"})
+
+	err := p.Parse(testArgs)
+	if err != nil {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if f1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if f2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if f3 == nil {
+		t.Errorf("Test %s failed with flag3 being nil pointer", t.Name())
+		return
+	}
+
+	if f4 == nil {
+		t.Errorf("Test %s failed with flag4 being nil pointer", t.Name())
+		return
+	}
+
+	if !(len(*f1) == len(testF1) && (*f1)[0] == testF1[0]) {
+		t.Errorf("Test %s i1 failed. Want: %f, got: %f", t.Name(), testF1, *f1)
+		return
+	}
+
+	if len(*f2) != 0 {
+		t.Errorf("Test %s i2 length failed. Want: [0], got: [%d]", t.Name(), len(*f2))
+		return
+	}
+
+	if !(len(*f3) == len(testF3) && (*f3)[0] == testF3[0]) {
+		t.Errorf("Test %s i3 failed. Want: %v, got: %v", t.Name(), testF3, *f3)
+		return
+	}
+
+	if len(*f4) != 0 {
+		t.Errorf("Test %s i4 length failed. Want: [0], got: [%d]", t.Name(), len(*f4))
+		return
+	}
+}
+
+// Strings nargs '+' test cases:
+//	* one arg
+//	* multiple args
+//	* at beginning of arg list
+//	* at end of arg list
+//	* multiple flags with '+'
+func TestFloatsNargs1orMore(t *testing.T) {
+	testF1 := []float64{1}
+	testF2 := []float64{3, 4}
+	testArgs := []string{
+		"progname",
+		"-f",
+		fmt.Sprintf("%f", testF1[0]),
+		"-g",
+		fmt.Sprintf("%f", testF2[0]),
+		fmt.Sprintf("%f", testF2[1]),
+	}
+
+	p := NewParser("", "description")
+	f1 := p.Floats("f", "flag-arg1", &Options{Nargs: "+"})
+	f2 := p.Floats("g", "flag-arg2", &Options{Nargs: "+"})
+
+	err := p.Parse(testArgs)
+	if err != nil {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if f1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if f2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if !(len(*f1) == len(testF1) && (*f1)[0] == testF1[0]) {
+		t.Errorf("Test %s i1 failed. Want: %v, got: %v", t.Name(), testF1, *f1)
+		return
+	}
+
+	if !(len(*f2) == len(testF2) && (*f2)[0] == testF2[0]) {
+		t.Errorf("Test %s i2 failed. Want: %v, got: %v", t.Name(), testF2, *f2)
+		return
+	}
+}
+
+func TestFloatsNargs1orMoreWithErr(t *testing.T) {
+	testArgs := []string{"progname", "-f", "-g", "3.0", "4.0"}
+
+	p := NewParser("", "description")
+	_ = p.Floats("f", "flag-arg1", &Options{Nargs: "+"})
+	_ = p.Floats("i", "flag-arg2", &Options{Nargs: "+"})
+
+	err := p.Parse(testArgs)
+	if err == nil {
+		t.Errorf("Test %s failed, expected \"... at least one argument\" error for --flag-arg1", t.Name())
+		return
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "requires at least one argument") {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
 		return
 	}
 }
