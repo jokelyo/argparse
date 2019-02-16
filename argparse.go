@@ -49,6 +49,7 @@ type Parser struct {
 type Options struct {
 	Required bool
 	Validate func(args []string) error
+	Nargs    interface{}
 	Help     string
 	Default  interface{}
 }
@@ -66,7 +67,6 @@ func NewParser(name string, description string) *Parser {
 	p.commands = make([]*Command, 0)
 
 	p.help()
-
 	return p
 }
 
@@ -126,12 +126,34 @@ func (o *Command) String(short string, long string, opts *Options) *string {
 	var result string
 
 	a := &arg{
-		result: &result,
-		sname:  short,
-		lname:  long,
-		size:   2,
-		opts:   opts,
-		unique: true,
+		result:     &result,
+		sname:      short,
+		lname:      long,
+		size:       2,
+		opts:       opts,
+		unique:     true,
+		honorNargs: false,
+	}
+
+	o.addArg(a)
+
+	return &result
+}
+
+// Strings creates new string argument, which will return whatever follows the argument on CLI.
+// Takes as arguments short name (must be single character or an empty string)
+// long name and (optional) options
+func (o *Command) Strings(short string, long string, opts *Options) *[]string {
+	result := make([]string, 0)
+
+	a := &arg{
+		result:     &result,
+		sname:      short,
+		lname:      long,
+		size:       2,
+		opts:       opts,
+		unique:     true,
+		honorNargs: true,
 	}
 
 	o.addArg(a)
@@ -160,12 +182,54 @@ func (o *Command) Int(short string, long string, opts *Options) *int {
 	return &result
 }
 
+// Ints creates new int argument, which will attempt to parse following argument as int.
+// Takes as arguments short name (must be single character or an empty string)
+// long name and (optional) options.
+// If parsing fails parser.Parse() will return an error.
+func (o *Command) Ints(short string, long string, opts *Options) *[]int {
+	result := make([]int, 0)
+
+	a := &arg{
+		result: &result,
+		sname:  short,
+		lname:  long,
+		size:   2,
+		opts:   opts,
+		unique: true,
+	}
+
+	o.addArg(a)
+
+	return &result
+}
+
 // Float creates new float argument, which will attempt to parse following argument as float64.
 // Takes as arguments short name (must be single character or an empty string)
 // long name and (optional) options.
 // If parsing fails parser.Parse() will return an error.
 func (o *Command) Float(short string, long string, opts *Options) *float64 {
 	var result float64
+
+	a := &arg{
+		result: &result,
+		sname:  short,
+		lname:  long,
+		size:   2,
+		opts:   opts,
+		unique: true,
+	}
+
+	o.addArg(a)
+
+	return &result
+}
+
+// Floats creates new float argument, which will attempt to parse following argument as float64.
+// Takes as arguments short name (must be single character or an empty string)
+// long name and (optional) options.
+// If parsing fails parser.Parse() will return an error.
+func (o *Command) Floats(short string, long string, opts *Options) *[]float64 {
+	result := make([]float64, 0)
 
 	a := &arg{
 		result: &result,

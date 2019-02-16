@@ -8,17 +8,18 @@ import (
 )
 
 type arg struct {
-	result   interface{} // Pointer to the resulting value
-	opts     *Options    // Options
-	sname    string      // Short name (in Parser will start with "-"
-	lname    string      // Long name (in Parser will start with "--"
-	size     int         // Size defines how many args after match will need to be consumed
-	unique   bool        // Specifies whether flag should be present only ones
-	parsed   bool        // Specifies whether flag has been parsed already
-	fileFlag int         // File mode to open file with
-	filePerm os.FileMode // File permissions to set a file
-	selector *[]string   // Used in Selector type to allow to choose only one from list of options
-	parent   *Command    // Used to get access to specific Command
+	result     interface{} // Pointer to the resulting value
+	opts       *Options    // Options
+	sname      string      // Short name (in Parser will start with "-"
+	lname      string      // Long name (in Parser will start with "--"
+	size       int         // Size defines how many args after match will need to be consumed
+	honorNargs bool        // Specifies whether arg honors the nargs option
+	unique     bool        // Specifies whether flag should be present only ones
+	parsed     bool        // Specifies whether flag has been parsed already
+	fileFlag   int         // File mode to open file with
+	filePerm   os.FileMode // File permissions to set a file
+	selector   *[]string   // Used in Selector type to allow to choose only one from list of options
+	parent     *Command    // Used to get access to specific Command
 }
 
 type help struct{}
@@ -183,18 +184,46 @@ func (o *arg) parse(args []string) error {
 		*o.result.(*os.File) = *f
 		o.parsed = true
 	case *[]string:
-		if len(args) < 1 {
-			return fmt.Errorf("[%s] must be followed by a string", o.name())
-		}
-		if len(args) > 1 {
-			return fmt.Errorf("[%s] followed by too many arguments", o.name())
-		}
-		*o.result.(*[]string) = append(*o.result.(*[]string), args[0])
+		*o.result.(*[]string) = append(*o.result.(*[]string), args...)
 		o.parsed = true
 	default:
 		return fmt.Errorf("unsupported type [%t]", o.result)
 	}
 	return nil
+}
+
+func (o *arg) setSize(index int, args *[]string) error {
+	if !o.honorNargs || o.opts == nil || o.opts.Nargs == nil {
+		return nil
+	}
+	if t, ok := o.opts.Nargs.(int); ok {
+		o.size = t + 1
+		return nil
+	} else if t, ok := o.opts.Nargs.(string); ok {
+		switch t {
+		case "?":
+			o.size = 1
+			if index+1 < len(*args) && !strings.HasPrefix((*args)[index+1], "-") {
+				o.size = 2
+			}
+			return nil
+		case "*", "+":
+			o.size = len(*args) - index
+			for i := index + 1; i < len(*args); i++ {
+				if strings.HasPrefix((*args)[i], "-") {
+					o.size = i - index
+					break
+				}
+			}
+			if t == "+" && o.size < 2 {
+				return fmt.Errorf("[%s] requires at least one argument", o.name())
+			}
+			return nil
+		default:
+			return fmt.Errorf("invalid string value [%s] for nargs", t)
+		}
+	}
+	return fmt.Errorf("invalid value [%t] for nargs", o.opts.Nargs)
 }
 
 func (o *arg) name() string {
@@ -228,7 +257,7 @@ func (o *arg) usage() string {
 	case *os.File:
 		result = result + " <file>"
 	case *[]string:
-		result = result + " \"<value>\"" + " [" + result + " \"<value>\" ...]"
+		result = result + " \"<value>\"" + " [\"<value>\" ...]"
 	default:
 		break
 	}
