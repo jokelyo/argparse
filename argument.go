@@ -197,6 +197,16 @@ func (o *arg) setSize(index int, args *[]string) error {
 		return nil
 	}
 	if t, ok := o.opts.Nargs.(int); ok {
+		cnt := 0
+		for i := index+1; i < index+t+1 && i < len(*args); i++ {
+			if strings.HasPrefix((*args)[i], "-") {
+				return fmt.Errorf("not enough arguments for %s", o.name())
+			}
+			cnt++
+		}
+		if cnt != t {
+			return fmt.Errorf("not enough arguments for %s", o.name())
+		}
 		o.size = t + 1
 		return nil
 	} else if t, ok := o.opts.Nargs.(string); ok {
