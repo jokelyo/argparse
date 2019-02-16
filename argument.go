@@ -243,18 +243,12 @@ func (o *arg) checkNargs(index int, args *[]string) error {
 	}
 
 	if t, ok := o.opts.Nargs.(int); ok {
+		switch o.result.(type) {
+		case *string, *int, *float64, *os.File:
+			return nil
+		}
 		if t < 1 {
 			return fmt.Errorf("[%s]: nargs integer value must be > 0", o.name())
-		}
-		switch o.result.(type) {
-		case *string:
-			return nil
-		case *int:
-			return nil
-		case *float64:
-			return nil
-		case *os.File:
-			return nil
 		}
 		cnt := 0
 		for i := index + 1; i < index+t+1 && i < len(*args); i++ {
@@ -272,11 +266,7 @@ func (o *arg) checkNargs(index int, args *[]string) error {
 		switch t {
 		case "?":
 			switch o.result.(type) {
-			case *[]string:
-				return nil
-			case *[]int:
-				return nil
-			case *[]float64:
+			case *[]string, *[]int, *[]float64:
 				return nil
 			}
 			o.size = 1
@@ -286,13 +276,7 @@ func (o *arg) checkNargs(index int, args *[]string) error {
 			return nil
 		case "*", "+":
 			switch o.result.(type) {
-			case *string:
-				return nil
-			case *int:
-				return nil
-			case *float64:
-				return nil
-			case *os.File:
+			case *string, *int, *float64, *os.File:
 				return nil
 			}
 			o.size = len(*args) - index
@@ -343,11 +327,7 @@ func (o *arg) usage() string {
 		}
 	case *os.File:
 		result = result + " <file>"
-	case *[]string:
-		result = result + " \"<value>\"" + " [\"<value>\" ...]"
-	case *[]int:
-		result = result + " \"<value>\"" + " [\"<value>\" ...]"
-	case *[]float64:
+	case *[]string, *[]int, *[]float64:
 		result = result + " \"<value>\"" + " [\"<value>\" ...]"
 	default:
 		break
