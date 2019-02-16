@@ -90,7 +90,7 @@ func (o *Command) parse(args *[]string) error {
 				continue
 			}
 			if oarg.check(arg) {
-				err := oarg.setSize(j, args)
+				err := oarg.checkNargs(j, args)
 				if err != nil {
 					return err
 				}

@@ -8,18 +8,17 @@ import (
 )
 
 type arg struct {
-	result     interface{} // Pointer to the resulting value
-	opts       *Options    // Options
-	sname      string      // Short name (in Parser will start with "-"
-	lname      string      // Long name (in Parser will start with "--"
-	size       int         // Size defines how many args after match will need to be consumed
-	honorNargs bool        // Specifies whether arg honors the nargs option
-	unique     bool        // Specifies whether flag should be present only ones
-	parsed     bool        // Specifies whether flag has been parsed already
-	fileFlag   int         // File mode to open file with
-	filePerm   os.FileMode // File permissions to set a file
-	selector   *[]string   // Used in Selector type to allow to choose only one from list of options
-	parent     *Command    // Used to get access to specific Command
+	result   interface{} // Pointer to the resulting value
+	opts     *Options    // Options
+	sname    string      // Short name (in Parser will start with "-"
+	lname    string      // Long name (in Parser will start with "--"
+	size     int         // Size defines how many args after match will need to be consumed
+	unique   bool        // Specifies whether flag should be present only ones
+	parsed   bool        // Specifies whether flag has been parsed already
+	fileFlag int         // File mode to open file with
+	filePerm os.FileMode // File permissions to set a file
+	selector *[]string   // Used in Selector type to allow to choose only one from list of options
+	parent   *Command    // Used to get access to specific Command
 }
 
 type help struct{}
@@ -124,11 +123,16 @@ func (o *arg) parse(args []string) error {
 		*o.result.(*bool) = true
 		o.parsed = true
 	case *int:
-		if len(args) < 1 {
-			return fmt.Errorf("[%s] must be followed by an integer", o.name())
-		}
 		if len(args) > 1 {
 			return fmt.Errorf("[%s] followed by too many arguments", o.name())
+		}
+		if len(args) < 1 {
+			// Nargs == ?
+			if o.size == 1 && o.opts.Default != nil {
+				o.parsed = true
+				return o.setDefault()
+			}
+			return fmt.Errorf("[%s] must be followed by an integer", o.name())
 		}
 		val, err := strconv.Atoi(args[0])
 		if err != nil {
@@ -137,11 +141,16 @@ func (o *arg) parse(args []string) error {
 		*o.result.(*int) = val
 		o.parsed = true
 	case *float64:
-		if len(args) < 1 {
-			return fmt.Errorf("[%s] must be followed by a floating point number", o.name())
-		}
 		if len(args) > 1 {
 			return fmt.Errorf("[%s] followed by too many arguments", o.name())
+		}
+		if len(args) < 1 {
+			// Nargs == ?
+			if o.size == 1 && o.opts.Default != nil {
+				o.parsed = true
+				return o.setDefault()
+			}
+			return fmt.Errorf("[%s] must be followed by a floating point number", o.name())
 		}
 		val, err := strconv.ParseFloat(args[0], 64)
 		if err != nil {
@@ -150,11 +159,16 @@ func (o *arg) parse(args []string) error {
 		*o.result.(*float64) = val
 		o.parsed = true
 	case *string:
-		if len(args) < 1 {
-			return fmt.Errorf("[%s] must be followed by a string", o.name())
-		}
 		if len(args) > 1 {
 			return fmt.Errorf("[%s] followed by too many arguments", o.name())
+		}
+		if len(args) < 1 {
+			// Nargs == ?
+			if o.size == 1 && o.opts.Default != nil {
+				o.parsed = true
+				return o.setDefault()
+			}
+			return fmt.Errorf("[%s] must be followed by a string", o.name())
 		}
 		// Selector case
 		if o.selector != nil {
@@ -171,11 +185,16 @@ func (o *arg) parse(args []string) error {
 		*o.result.(*string) = args[0]
 		o.parsed = true
 	case *os.File:
-		if len(args) < 1 {
-			return fmt.Errorf("[%s] must be followed by a path to file", o.name())
-		}
 		if len(args) > 1 {
 			return fmt.Errorf("[%s] followed by too many arguments", o.name())
+		}
+		if len(args) < 1 {
+			// Nargs == ?
+			if o.size == 1 && o.opts.Default != nil {
+				o.parsed = true
+				return o.setDefault()
+			}
+			return fmt.Errorf("[%s] must be followed by a path to file", o.name())
 		}
 		f, err := os.OpenFile(args[0], o.fileFlag, o.filePerm)
 		if err != nil {
@@ -192,13 +211,31 @@ func (o *arg) parse(args []string) error {
 	return nil
 }
 
-func (o *arg) setSize(index int, args *[]string) error {
-	if !o.honorNargs || o.opts == nil || o.opts.Nargs == nil {
+func (o *arg) checkNargs(index int, args *[]string) error {
+	if o.opts == nil || o.opts.Nargs == nil {
 		return nil
 	}
+	switch o.result.(type) {
+	case *bool:
+		return nil
+	}
+
 	if t, ok := o.opts.Nargs.(int); ok {
+		if t < 1 {
+			return fmt.Errorf("[%s]: nargs integer value must be > 0", o.name())
+		}
+		switch o.result.(type) {
+		case *string:
+			return nil
+		case *int:
+			return nil
+		case *float64:
+			return nil
+		case *os.File:
+			return nil
+		}
 		cnt := 0
-		for i := index+1; i < index+t+1 && i < len(*args); i++ {
+		for i := index + 1; i < index+t+1 && i < len(*args); i++ {
 			if strings.HasPrefix((*args)[i], "-") {
 				return fmt.Errorf("not enough arguments for %s", o.name())
 			}
@@ -212,12 +249,30 @@ func (o *arg) setSize(index int, args *[]string) error {
 	} else if t, ok := o.opts.Nargs.(string); ok {
 		switch t {
 		case "?":
+			switch o.result.(type) {
+			case *[]string:
+				return nil
+			case *[]int:
+				return nil
+			case *[]float64:
+				return nil
+			}
 			o.size = 1
 			if index+1 < len(*args) && !strings.HasPrefix((*args)[index+1], "-") {
 				o.size = 2
 			}
 			return nil
 		case "*", "+":
+			switch o.result.(type) {
+			case *string:
+				return nil
+			case *int:
+				return nil
+			case *float64:
+				return nil
+			case *os.File:
+				return nil
+			}
 			o.size = len(*args) - index
 			for i := index + 1; i < len(*args); i++ {
 				if strings.HasPrefix((*args)[i], "-") {
@@ -289,46 +344,43 @@ func (o *arg) getHelpMessage() string {
 }
 
 func (o *arg) setDefault() error {
-	// Only set default if it was not parsed, and default value was defined
-	if !o.parsed && o.opts != nil && o.opts.Default != nil {
-		switch o.result.(type) {
-		case *bool:
-			if _, ok := o.opts.Default.(bool); !ok {
-				return fmt.Errorf("cannot use default type [%T] as type [bool]", o.opts.Default)
-			}
-			*o.result.(*bool) = o.opts.Default.(bool)
-		case *int:
-			if _, ok := o.opts.Default.(int); !ok {
-				return fmt.Errorf("cannot use default type [%T] as type [int]", o.opts.Default)
-			}
-			*o.result.(*int) = o.opts.Default.(int)
-		case *float64:
-			if _, ok := o.opts.Default.(float64); !ok {
-				return fmt.Errorf("cannot use default type [%T] as type [float64]", o.opts.Default)
-			}
-			*o.result.(*float64) = o.opts.Default.(float64)
-		case *string:
-			if _, ok := o.opts.Default.(string); !ok {
-				return fmt.Errorf("cannot use default type [%T] as type [string]", o.opts.Default)
-			}
-			*o.result.(*string) = o.opts.Default.(string)
-		case *os.File:
-			// In case of File we should get string as default value
-			if v, ok := o.opts.Default.(string); ok {
-				f, err := os.OpenFile(v, o.fileFlag, o.filePerm)
-				if err != nil {
-					return err
-				}
-				*o.result.(*os.File) = *f
-			} else {
-				return fmt.Errorf("cannot use default type [%T] as type [string]", o.opts.Default)
-			}
-		case *[]string:
-			if _, ok := o.opts.Default.([]string); !ok {
-				return fmt.Errorf("cannot use default type [%T] as type [[]string]", o.opts.Default)
-			}
-			*o.result.(*[]string) = o.opts.Default.([]string)
+	switch o.result.(type) {
+	case *bool:
+		if _, ok := o.opts.Default.(bool); !ok {
+			return fmt.Errorf("cannot use default type [%T] as type [bool]", o.opts.Default)
 		}
+		*o.result.(*bool) = o.opts.Default.(bool)
+	case *int:
+		if _, ok := o.opts.Default.(int); !ok {
+			return fmt.Errorf("cannot use default type [%T] as type [int]", o.opts.Default)
+		}
+		*o.result.(*int) = o.opts.Default.(int)
+	case *float64:
+		if _, ok := o.opts.Default.(float64); !ok {
+			return fmt.Errorf("cannot use default type [%T] as type [float64]", o.opts.Default)
+		}
+		*o.result.(*float64) = o.opts.Default.(float64)
+	case *string:
+		if _, ok := o.opts.Default.(string); !ok {
+			return fmt.Errorf("cannot use default type [%T] as type [string]", o.opts.Default)
+		}
+		*o.result.(*string) = o.opts.Default.(string)
+	case *os.File:
+		// In case of File we should get string as default value
+		if v, ok := o.opts.Default.(string); ok {
+			f, err := os.OpenFile(v, o.fileFlag, o.filePerm)
+			if err != nil {
+				return err
+			}
+			*o.result.(*os.File) = *f
+		} else {
+			return fmt.Errorf("cannot use default type [%T] as type [string]", o.opts.Default)
+		}
+	case *[]string:
+		if _, ok := o.opts.Default.([]string); !ok {
+			return fmt.Errorf("cannot use default type [%T] as type [[]string]", o.opts.Default)
+		}
+		*o.result.(*[]string) = o.opts.Default.([]string)
 	}
 
 	return nil

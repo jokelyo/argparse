@@ -132,7 +132,6 @@ func (o *Command) String(short string, long string, opts *Options) *string {
 		size:       2,
 		opts:       opts,
 		unique:     true,
-		honorNargs: false,
 	}
 
 	o.addArg(a)
@@ -153,7 +152,6 @@ func (o *Command) Strings(short string, long string, opts *Options) *[]string {
 		size:       2,
 		opts:       opts,
 		unique:     true,
-		honorNargs: true,
 	}
 
 	o.addArg(a)
