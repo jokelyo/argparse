@@ -205,6 +205,28 @@ func (o *arg) parse(args []string) error {
 	case *[]string:
 		*o.result.(*[]string) = append(*o.result.(*[]string), args...)
 		o.parsed = true
+	case *[]int:
+		ret := make([]int, 0)
+		for _, arg := range args {
+			i, err := strconv.Atoi(arg)
+			if err != nil {
+				return fmt.Errorf("[%s] bad integer value [%s]", o.name(), arg)
+			}
+			ret = append(ret, i)
+		}
+		*o.result.(*[]int) = append(*o.result.(*[]int), ret...)
+		o.parsed = true
+	case *[]float64:
+		ret := make([]float64, 0)
+		for _, arg := range args {
+			f, err := strconv.ParseFloat(arg, 64)
+			if err != nil {
+				return fmt.Errorf("[%s] bad floating point value [%s]", o.name(), arg)
+			}
+			ret = append(ret, f)
+		}
+		*o.result.(*[]float64) = append(*o.result.(*[]float64), ret...)
+		o.parsed = true
 	default:
 		return fmt.Errorf("unsupported type [%t]", o.result)
 	}
@@ -323,6 +345,10 @@ func (o *arg) usage() string {
 		result = result + " <file>"
 	case *[]string:
 		result = result + " \"<value>\"" + " [\"<value>\" ...]"
+	case *[]int:
+		result = result + " \"<value>\"" + " [\"<value>\" ...]"
+	case *[]float64:
+		result = result + " \"<value>\"" + " [\"<value>\" ...]"
 	default:
 		break
 	}
@@ -381,6 +407,16 @@ func (o *arg) setDefault() error {
 			return fmt.Errorf("cannot use default type [%T] as type [[]string]", o.opts.Default)
 		}
 		*o.result.(*[]string) = o.opts.Default.([]string)
+	case *[]int:
+		if _, ok := o.opts.Default.([]int); !ok {
+			return fmt.Errorf("cannot use default type [%T] as type [[]int]", o.opts.Default)
+		}
+		*o.result.(*[]int) = o.opts.Default.([]int)
+	case *[]float64:
+		if _, ok := o.opts.Default.([]float64); !ok {
+			return fmt.Errorf("cannot use default type [%T] as type [[]float64]", o.opts.Default)
+		}
+		*o.result.(*[]float64) = o.opts.Default.([]float64)
 	}
 
 	return nil
