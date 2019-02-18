@@ -128,9 +128,12 @@ func (o *arg) parse(args []string) error {
 		}
 		if len(args) < 1 {
 			// Nargs == ?
-			if o.size == 1 && o.opts.Default != nil {
+			if o.size == 1 {
 				o.parsed = true
-				return o.setDefault()
+				if o.opts.Default != nil {
+					return o.setDefault()
+				}
+				return nil
 			}
 			return fmt.Errorf("[%s] must be followed by an integer", o.name())
 		}
@@ -146,9 +149,12 @@ func (o *arg) parse(args []string) error {
 		}
 		if len(args) < 1 {
 			// Nargs == ?
-			if o.size == 1 && o.opts.Default != nil {
+			if o.size == 1 {
 				o.parsed = true
-				return o.setDefault()
+				if o.opts.Default != nil {
+					return o.setDefault()
+				}
+				return nil
 			}
 			return fmt.Errorf("[%s] must be followed by a floating point number", o.name())
 		}
@@ -164,9 +170,12 @@ func (o *arg) parse(args []string) error {
 		}
 		if len(args) < 1 {
 			// Nargs == ?
-			if o.size == 1 && o.opts.Default != nil {
+			if o.size == 1 {
 				o.parsed = true
-				return o.setDefault()
+				if o.opts.Default != nil {
+					return o.setDefault()
+				}
+				return nil
 			}
 			return fmt.Errorf("[%s] must be followed by a string", o.name())
 		}
@@ -190,9 +199,12 @@ func (o *arg) parse(args []string) error {
 		}
 		if len(args) < 1 {
 			// Nargs == ?
-			if o.size == 1 && o.opts.Default != nil {
+			if o.size == 1 {
 				o.parsed = true
-				return o.setDefault()
+				if o.opts.Default != nil {
+					return o.setDefault()
+				}
+				return nil
 			}
 			return fmt.Errorf("[%s] must be followed by a path to file", o.name())
 		}
