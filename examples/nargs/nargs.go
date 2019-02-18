@@ -13,7 +13,7 @@ func main() {
 	parser := argparse.NewParser("print", "Prints provided string to stdout")
 	// Create string flags
 	s := parser.String("s", "string", &argparse.Options{Help: "Silently ignores nargs N value", Nargs: 3})
-        s2 := parser.String("", "string2", &argparse.Options{Help: "Requires 0 or 1 arguments, Default valut not set", Nargs: "?"})
+	s2 := parser.String("", "string2", &argparse.Options{Help: "Requires 0 or 1 arguments, Default value not set", Nargs: "?"})
 	s3 := parser.Strings("", "strings", &argparse.Options{Help: "One or more arguments", Nargs: "+"})
 	s4 := parser.Strings("", "strings2", &argparse.Options{Help: "Zero or more arguments", Nargs: "*"})
 	s5 := parser.Strings("", "strings3", &argparse.Options{Help: "Requires 3 arguments", Nargs: 3})
