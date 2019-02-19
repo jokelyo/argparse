@@ -361,6 +361,27 @@ func TestStringsNargsIntWithErr(t *testing.T) {
 	}
 }
 
+// if the args are given on the CLI in opposite order of how they're declared,
+// the nargs operators would try to grab empty strings left behind by reduce()
+func TestStringsNargsIntParseOrder(t *testing.T) {
+	testArgs := []string{"progname", "-g", "test", "-f", "test"}
+
+	p := NewParser("", "description")
+	_ = p.String("f", "flag-arg1", nil)
+	_ = p.Strings("g", "flag-arg2", &Options{Nargs: 2})
+
+	err := p.Parse(testArgs)
+	if err == nil {
+		t.Errorf("Test %s failed, expected \"not enough arguments ...\" error for --flag-arg2", t.Name())
+		return
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "not enough arguments") {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+}
+
 // String nargs '?' test cases:
 //	* one arg
 //	* no args
@@ -416,6 +437,42 @@ func TestStringNargs0or1(t *testing.T) {
 
 	if *s4 != "test4" {
 		t.Errorf("Test %s s4 failed. Want: [%s], got: [%s]", t.Name(), "test4", *s4)
+		return
+	}
+}
+
+// if the args are given on the CLI in opposite order of how they're declared,
+// the nargs operators would try to grab empty strings left behind by reduce()
+func TestStringNargs0or1ParseOrder(t *testing.T) {
+	testArgs := []string{"progname", "-g", "-f", "test"}
+
+	p := NewParser("", "description")
+	s1 := p.String("f", "flag-arg1", nil)
+	s2 := p.String("g", "flag-arg2", &Options{Nargs: "?", Default: "test2"})
+
+	err := p.Parse(testArgs)
+	if err != nil {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if s1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if s2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if *s1 != "test" {
+		t.Errorf("Test %s s1 failed. Want: [test], got: [%s]", t.Name(), *s1)
+		return
+	}
+
+	if *s2 != "test2" {
+		t.Errorf("Test %s s2 failed. Want: [%s], got: [%s]", t.Name(), "test2", *s2)
 		return
 	}
 }
@@ -484,15 +541,15 @@ func TestStringsNargs0orMore(t *testing.T) {
 	}
 }
 
-// when reduce() changes args to empty strings, if the args with '*' is parsed
-// last, it would gather up empty strings left by reduce()
+// if the args are given on the CLI in opposite order of how they're declared,
+// the nargs operators would try to grab empty strings left behind by reduce()
 func TestStringsNargs0orMoreParseOrder(t *testing.T) {
 	testS2 := []string{"test", "test"}
-	testArgs := []string{"progname", "-f", testS2[0], testS2[1], "-g", "test"}
+	testArgs := []string{"progname", "-g", testS2[0], testS2[1], "-f", "test"}
 
 	p := NewParser("", "description")
-	s1 := p.String("g", "flag-arg2", nil)
-	s2 := p.Strings("f", "flag-arg1", &Options{Nargs: "*"})
+	s1 := p.String("f", "flag-arg1", nil)
+	s2 := p.Strings("g", "flag-arg2", &Options{Nargs: "*"})
 
 	err := p.Parse(testArgs)
 	if err != nil {
@@ -579,6 +636,43 @@ func TestStringsNargs1orMoreWithErr(t *testing.T) {
 
 	if err != nil && !strings.Contains(err.Error(), "requires at least one argument") {
 		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+}
+
+// if the args are given on the CLI in opposite order of how they're declared,
+// the nargs operators would try to grab empty strings left behind by reduce()
+func TestStringsNargs1orMoreParseOrder(t *testing.T) {
+	testS2 := []string{"test", "test"}
+	testArgs := []string{"progname", "-g", testS2[0], testS2[1], "-f", "test"}
+
+	p := NewParser("", "description")
+	s1 := p.String("f", "flag-arg1", nil)
+	s2 := p.Strings("g", "flag-arg2", &Options{Nargs: "*"})
+
+	err := p.Parse(testArgs)
+	if err != nil {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if s1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if s2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if !(len(*s2) == len(testS2) && (*s2)[0] == "test") {
+		t.Errorf("Test %s s1 failed. Want: %s, got: %s", t.Name(), testS2, *s2)
+		return
+	}
+
+	if *s1 != "test" {
+		t.Errorf("Test %s s2 failed. Want: [test], got: [%s]", t.Name(), *s2)
 		return
 	}
 }
