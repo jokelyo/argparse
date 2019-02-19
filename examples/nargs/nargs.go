@@ -33,16 +33,16 @@ func main() {
 	}
 	// Finally print the collected values
 	args := map[string]interface{}{
-		"s":  *s,
-		"s2": *s2,
-		"s3": *s3,
-		"s4": *s4,
-		"s5": *s5,
-		"i":  *i,
-		"i2": *i2,
-		"i3": *i3,
-		"i4": *i4,
-		"i5": *i5,
+		"--string":   *s,
+		"--string2":  *s2,
+		"--strings":  *s3,
+		"--strings2": *s4,
+		"--strings3": *s5,
+		"--int":      *i,
+		"--int2":     *i2,
+		"--ints":     *i3,
+		"--ints2":    *i4,
+		"--ints3":    *i5,
 	}
 	keys := make([]string, 0, len(args))
 	for k := range args {
