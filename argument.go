@@ -293,7 +293,7 @@ func (o *arg) checkNargs(index int, args *[]string) error {
 			}
 			o.size = len(*args) - index
 			for i := index + 1; i < len(*args); i++ {
-				if strings.HasPrefix((*args)[i], "-") {
+				if strings.HasPrefix((*args)[i], "-") || (*args)[i] == "" {
 					o.size = i - index
 					break
 				}

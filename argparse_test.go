@@ -484,6 +484,43 @@ func TestStringsNargs0orMore(t *testing.T) {
 	}
 }
 
+// when reduce() changes args to empty strings, if the args with '*' is parsed
+// last, it would gather up empty strings left by reduce()
+func TestStringsNargs0orMoreParseOrder(t *testing.T) {
+	testS2 := []string{"test", "test"}
+	testArgs := []string{"progname", "-f", testS2[0], testS2[1], "-g", "test"}
+
+	p := NewParser("", "description")
+	s1 := p.String("g", "flag-arg2", nil)
+	s2 := p.Strings("f", "flag-arg1", &Options{Nargs: "*"})
+
+	err := p.Parse(testArgs)
+	if err != nil {
+		t.Errorf("Test %s failed with error: %s", t.Name(), err.Error())
+		return
+	}
+
+	if s1 == nil {
+		t.Errorf("Test %s failed with flag1 being nil pointer", t.Name())
+		return
+	}
+
+	if s2 == nil {
+		t.Errorf("Test %s failed with flag2 being nil pointer", t.Name())
+		return
+	}
+
+	if !(len(*s2) == len(testS2) && (*s2)[0] == "test") {
+		t.Errorf("Test %s s1 failed. Want: %s, got: %s", t.Name(), testS2, *s2)
+		return
+	}
+
+	if *s1 != "test" {
+		t.Errorf("Test %s s2 failed. Want: [test], got: [%s]", t.Name(), *s2)
+		return
+	}
+}
+
 // Strings nargs '+' test cases:
 //	* one arg
 //	* multiple args
