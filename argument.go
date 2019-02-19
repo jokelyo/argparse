@@ -264,7 +264,7 @@ func (o *arg) checkNargs(index int, args *[]string) error {
 		}
 		cnt := 0
 		for i := index + 1; i < index+t+1 && i < len(*args); i++ {
-			if strings.HasPrefix((*args)[i], "-") {
+			if strings.HasPrefix((*args)[i], "-") || (*args)[i] == "" {
 				return fmt.Errorf("not enough arguments for %s", o.name())
 			}
 			cnt++
@@ -282,7 +282,7 @@ func (o *arg) checkNargs(index int, args *[]string) error {
 				return nil
 			}
 			o.size = 1
-			if index+1 < len(*args) && !strings.HasPrefix((*args)[index+1], "-") {
+			if index+1 < len(*args) && !(strings.HasPrefix((*args)[index+1], "-") || (*args)[index+1] == "") {
 				o.size = 2
 			}
 			return nil
