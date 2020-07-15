@@ -283,7 +283,7 @@ func (o *arg) parseFile(args []string) error {
 
 func (o *arg) parseStringList(args []string) error {
 	//data of []string type is for List and StringList argument with set of string parameters
-	if o.opts == nil || o.opts.Nargs == nil {
+	if !hasNargs(o.opts) {
 		// only check arg length if Nargs is disabled
 		if len(args) < 1 {
 			return fmt.Errorf("[%s] must be followed by a string", o.name())
@@ -299,7 +299,7 @@ func (o *arg) parseStringList(args []string) error {
 
 func (o *arg) parseIntList(args []string) error {
 	//data of []int type is for IntList argument with set of int parameters
-	if o.opts == nil || o.opts.Nargs == nil {
+	if !hasNargs(o.opts) {
 		// only check arg length if Nargs is disabled
 		switch {
 		case len(args) < 1:
@@ -324,7 +324,7 @@ func (o *arg) parseIntList(args []string) error {
 
 func (o *arg) parseFloatList(args []string) error {
 	//data of []float type is for FloatList argument with set of float parameters
-	if o.opts == nil || o.opts.Nargs == nil {
+	if !hasNargs(o.opts) {
 		// only check arg length if Nargs is disabled
 		switch {
 		case len(args) < 1:
@@ -492,6 +492,13 @@ func (o *arg) checkNargs(index int, args *[]string) error {
 		}
 	}
 	return fmt.Errorf("invalid value [%t] for nargs", o.opts.Nargs)
+}
+
+func hasNargs(opts *Options) bool {
+	if opts == nil {
+		return false
+	}
+	return opts.Nargs != nil
 }
 
 func isNargsQMark(opts *Options) bool {
